@@ -1,0 +1,13 @@
+[Unit]
+Description=Discord Bot
+
+[Service]
+Type=simple
+ExecStart=/opt/discordbot/discordbot
+Restart=always
+RestartSec=30
+StartLimitBurst=0
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
