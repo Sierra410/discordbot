@@ -11,7 +11,12 @@ func messageCreate(session *discordgo.Session, data *discordgo.MessageCreate) {
 		return
 	}
 
-	cmd, err := parseCommand(msg)
+	prefix, ok := cfg.GetPerServerConfig(data.GuildID)["CommandPrefix"].(string)
+	if !ok {
+		prefix = cfg.DefaultCommandPrefix
+	}
+
+	cmd, err := parseCommand(msg, prefix)
 	switch err {
 	case nil:
 		_ = cmd.execute(session)

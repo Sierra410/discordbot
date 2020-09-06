@@ -4,39 +4,58 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"sync"
 )
 
 var configFilePath = "config.json"
 var cfg = &Config{}
 
 type Config struct {
-	Token  string
-	Status string
+	lock sync.Mutex
 
-	CommandPrefix string
+	Token                string
+	Status               string
+	DefaultCommandPrefix string
+	Admins               []string
 
-	Admins []string
-
-	ReactionRoles map[string]ReactionRole
+	PerServerConfig map[string]*PerServerConfig
 }
 
 func (self *Config) fillBlanks() {
-	// Defaults, basically
+	self.lock.Lock()
 
-	if self.CommandPrefix == "" {
-		self.CommandPrefix = "!"
+	if self.DefaultCommandPrefix == "" {
+		self.DefaultCommandPrefix = "!"
 	}
 
 	if self.Admins == nil {
 		self.Admins = []string{}
 	}
 
-	if self.ReactionRoles == nil {
-		self.ReactionRoles = map[string]ReactionRole{}
+	if self.PerServerConfig == nil {
+		self.PerServerConfig = map[string]*PerServerConfig{}
 	}
+
+	self.lock.Unlock()
+}
+
+func (self *Config) GetPerServerConfig(id string) *PerServerConfig {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	c, ok := self.PerServerConfig[id]
+	if !ok {
+		c = &PerServerConfig{}
+		self.PerServerConfig[id] = c
+	}
+
+	return c
 }
 
 func (self *Config) Save() error {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	self.fillBlanks()
 	m, err := json.MarshalIndent(cfg, "", "\t")
 	if err != nil {
@@ -49,6 +68,9 @@ func (self *Config) Save() error {
 }
 
 func (self *Config) Load() error {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	bytes, err := ioutil.ReadFile(configFilePath)
 
 	if os.IsNotExist(err) {
@@ -65,6 +87,9 @@ func (self *Config) Load() error {
 }
 
 func (self *Config) IsAdmin(s string) bool {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
 	for _, adminId := range cfg.Admins {
 		if s == adminId {
 			return true

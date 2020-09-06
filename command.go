@@ -53,8 +53,8 @@ type parsedCommand struct {
 
 // Parses a string (message content)
 // args are parsed as CSV with " " (space) instead of a comma
-func parseCommand(msg *discordgo.Message) (*parsedCommand, error) {
-	if !strings.HasPrefix(msg.Content, cfg.CommandPrefix) {
+func parseCommand(msg *discordgo.Message, prefix string) (*parsedCommand, error) {
+	if !strings.HasPrefix(msg.Content, prefix) {
 		return nil, errNotCommand
 	}
 
@@ -88,7 +88,7 @@ func parseCommand(msg *discordgo.Message) (*parsedCommand, error) {
 		}
 	}
 
-	cmd.command = strings.ToLower(strings.TrimPrefix(fields[0], cfg.CommandPrefix))
+	cmd.command = strings.ToLower(strings.TrimPrefix(fields[0], prefix))
 
 	return cmd, nil
 }

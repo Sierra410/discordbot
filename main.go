@@ -50,8 +50,8 @@ func main() {
 		}
 	})
 
-	session.AddHandler(rulesReactionAdd)
-	session.AddHandler(rulesReationRemove)
+	// session.AddHandler(rulesReactionAdd)
+	// session.AddHandler(rulesReationRemove)
 
 	session.AddHandler(messageCreate)
 
