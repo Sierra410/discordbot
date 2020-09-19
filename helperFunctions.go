@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -11,8 +11,7 @@ import (
 // Discord Stuff
 
 var (
-	logChannelName   = "log"
-	errInvalidUserId = errors.New("Invalid user id")
+	logChannelName = "log"
 )
 
 type channelSearchFunc func(*discordgo.Channel) bool
@@ -85,11 +84,11 @@ func findChannel(channels []*discordgo.Channel, sfunc channelSearchFunc) *discor
 }
 
 func validateUserId(session *discordgo.Session, userid string) bool {
-	_, err := session.User(clearUserID(userid))
+	_, err := session.User(userid)
 	return err == nil
 }
 
-func validateUserIds(session *discordgo.Session, userids []string) ([]string, error) {
+func validateUserIds(session *discordgo.Session, userids []string) []string {
 	valid := make([]string, 0, len(userids))
 
 	for _, id := range userids {
@@ -98,10 +97,21 @@ func validateUserIds(session *discordgo.Session, userids []string) ([]string, er
 		}
 	}
 
-	return valid, nil
+	return valid
 }
 
-// Removes <@ and >, if present
+// Removes <@ and >, if present. Does not validate the id.
+func clearUserIDs(s []string) []string {
+	newSlice := make([]string, len(s))
+
+	for i := range s {
+		newSlice[i] = clearUserID(s[i])
+	}
+
+	return newSlice
+}
+
+// Removes <@ and >, if present. Does not validate the id.
 func clearUserID(s string) string {
 	if s[0:2] == "<@" && s[len(s)-1] == '>' {
 		s = s[2 : len(s)-1]
@@ -127,14 +137,58 @@ func joinSlicesOfStrings(a []string, b []string) []string {
 	return new
 }
 
-func isStringInSlice(s string, sl []string) bool {
-	for _, x := range sl {
-		if x == s {
+// func isStringInSlice(s string, sl []string) bool {
+// 	for _, x := range sl {
+// 		if x == s {
+// 			return true
+// 		}
+// 	}
+
+// 	return false
+// }
+
+func isInSlice(i interface{}, s []interface{}) bool {
+	for _, x := range s {
+		if x == i {
 			return true
 		}
 	}
 
 	return false
+}
+
+func removeFromStringSlice(s []string, r ...string) ([]string, []string) {
+	newSlice := make([]string, 0, cap(s))
+	removed := []string{}
+
+	for _, x := range s {
+		for _, y := range r {
+			if x != y {
+				newSlice = append(newSlice, x)
+			} else {
+				removed = append(removed, x)
+			}
+		}
+	}
+
+	return newSlice, removed
+}
+
+func removeFromSlice(s []interface{}, r ...interface{}) ([]interface{}, []interface{}) {
+	newSlice := make([]interface{}, 0, cap(s))
+	removed := []interface{}{}
+
+	for _, x := range s {
+		for _, y := range r {
+			if x != y {
+				newSlice = append(newSlice, x)
+			} else {
+				removed = append(removed, x)
+			}
+		}
+	}
+
+	return newSlice, removed
 }
 
 func firstWord(s string) string {
@@ -216,4 +270,61 @@ outer:
 	}
 
 	return pages
+}
+
+// interfaces
+
+func interfaceToString(i interface{}) string {
+	switch x := i.(type) {
+	case string:
+		return x
+	default:
+		return ""
+	}
+}
+
+func interfaceToInterfaceSlice(i interface{}) []interface{} {
+	if i == nil {
+		return []interface{}{}
+	}
+
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Slice:
+		v := reflect.ValueOf(i)
+		s := make([]interface{}, v.Len())
+
+		for i := 0; i < v.Len(); i++ {
+			s[i] = v.Index(i).Interface()
+		}
+
+		return s
+	default:
+		return []interface{}{}
+	}
+}
+
+func interfaceSliceToStringSlice(i []interface{}) []string {
+	newSlice := make([]string, 0, cap(i))
+
+	for _, x := range i {
+		switch x := x.(type) {
+		case string:
+			newSlice = append(newSlice, x)
+		}
+	}
+
+	return newSlice
+}
+
+func idToMention(s string) string {
+	return "<@" + s + ">"
+}
+
+func idsToMentions(s []string) []string {
+	newSlice := make([]string, len(s))
+	for i := range s {
+		newSlice[i] = idToMention(s[i])
+	}
+
+	return newSlice
 }

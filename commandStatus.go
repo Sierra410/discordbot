@@ -32,8 +32,7 @@ func commandStatus(self *explicitCommand, session *discordgo.Session, cmd *parse
 		}
 	}
 
-	cfg.Status = gameType + newStatus
-	cfg.Save()
+	cfg.Set("", configStatus, gameType+newStatus)
 
 	updateStatus(session)
 
@@ -44,9 +43,10 @@ func updateStatus(session *discordgo.Session) {
 	status := ""
 	gameType := discordgo.GameTypeGame
 
-	if len(cfg.Status) >= 2 {
-		status = cfg.Status[1:]
-		gameType = gameTypeAtoi(rune(cfg.Status[0]))
+	tStatus := cfg.Get("", configStatus).(string)
+	if len(tStatus) >= 2 {
+		status = tStatus[1:]
+		gameType = gameTypeAtoi(rune(tStatus[0]))
 		if gameType == -1 {
 			gameType = discordgo.GameTypeGame
 		}

@@ -10,7 +10,7 @@ import (
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
 		adminOnly:   true,
-		chatType:    chatTypeDm,
+		chatType:    chatTypeAny,
 		command:     "setprefix",
 		helpMessage: "Usage: setprefix newprefix",
 		function:    commandSetCommandPrefix,
@@ -32,9 +32,7 @@ func commandSetCommandPrefix(self *explicitCommand, session *discordgo.Session, 
 		return errPrefixCannotContainSpaces.Error(), nil
 	}
 
-	oldPrefix := cfg.CommandPrefix
-	cfg.CommandPrefix = newPrefix
-	cfg.Save()
+	cfg.Set(cmd.message.GuildID, configCommandPrefix, newPrefix)
 
-	return "Command prefix was changed from ``" + oldPrefix + "`` to ``" + newPrefix + "``", nil
+	return "Command prefix was changed from ``" + cmd.prefix + "`` to ``" + newPrefix + "``", nil
 }

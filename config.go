@@ -1,75 +1,141 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
+	"local/discordbot/config"
+
+	"github.com/bwmarrin/discordgo"
+)
+
+const (
+	configStatus        = "Status"
+	configAdmins        = "Admins"
+	configCommandPrefix = "CommandPrefix"
+
+	configDefaultCommandPrefix = "!"
 )
 
 var configFilePath = "config.json"
-var cfg = &Config{}
+var cfg Config
 
 type Config struct {
-	Token  string
-	Status string
-
-	CommandPrefix string
-
-	Admins []string
-
-	ReactionRoles map[string]ReactionRole
+	cfg config.Config
 }
 
-func (self *Config) fillBlanks() {
-	// Defaults, basically
+func NewConfig(path string) Config {
+	return Config{
+		cfg: config.NewConfig(path),
+	}
+}
 
-	if self.CommandPrefix == "" {
-		self.CommandPrefix = "!"
+func (self *Config) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
+	self.RLock()
+	defer self.RUnlock()
+
+	admins := interfaceToInterfaceSlice(self.Get("", configAdmins))
+	if isInSlice(id, admins) {
+		return true
 	}
 
-	if self.Admins == nil {
-		self.Admins = []string{}
+	admins = interfaceToInterfaceSlice(self.Get(guildId, configAdmins))
+	if isInSlice(id, admins) {
+		return true
 	}
 
-	if self.ReactionRoles == nil {
-		self.ReactionRoles = map[string]ReactionRole{}
+	guild, err := session.Guild(guildId)
+	return err == nil && guild.OwnerID == id
+}
+
+func (self *Config) SetPrefix(guildId string, prefix string) string {
+	return self.Set(guildId, configCommandPrefix, prefix).(string)
+}
+
+func (self *Config) GetPrefix(guildId string) string {
+	if guildId == "" {
+		return ""
 	}
+
+	p := interfaceToString(
+		self.Get(guildId, configCommandPrefix),
+	)
+
+	if p != "" {
+		return p
+	}
+
+	p = interfaceToString(
+		self.Get("", configCommandPrefix),
+	)
+
+	if p != "" {
+		return p
+	}
+
+	cfg.Set("", configCommandPrefix, configDefaultCommandPrefix)
+
+	return configDefaultCommandPrefix
+}
+
+func (self *Config) GetOr(guildId string, k string, def interface{}) interface{} {
+	x := self.Get(guildId, k)
+	if x == nil {
+		return def
+	}
+
+	return x
+}
+
+func (self *Config) Get(guildId string, k string) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.Get(k)
+}
+
+func (self *Config) UnsafeGet(guildId string, k string) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.UnsafeGet(k)
+}
+
+func (self *Config) Set(guildId string, k string, v interface{}) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.Set(k, v)
+}
+
+func (self *Config) UnsafeSet(guildId string, k string, v interface{}) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.UnsafeSet(k, v)
 }
 
 func (self *Config) Save() error {
-	self.fillBlanks()
-	m, err := json.MarshalIndent(cfg, "", "\t")
-	if err != nil {
-		return nil
-	}
-
-	err = ioutil.WriteFile(configFilePath, m, 0640)
-
-	return err
+	return self.cfg.Save()
 }
 
 func (self *Config) Load() error {
-	bytes, err := ioutil.ReadFile(configFilePath)
-
-	if os.IsNotExist(err) {
-		self.Save()
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(bytes, &cfg)
-	cfg.fillBlanks()
-
-	return err
+	return self.cfg.Load()
 }
 
-func (self *Config) IsAdmin(s string) bool {
-	for _, adminId := range cfg.Admins {
-		if s == adminId {
-			return true
-		}
-	}
+func (self *Config) Lock() {
+	self.cfg.Lock()
+}
 
-	return false
+func (self *Config) Unlock() {
+	self.cfg.Unlock()
+}
+
+func (self *Config) RLock() {
+	self.cfg.RLock()
+}
+
+func (self *Config) RUnlock() {
+	self.cfg.RUnlock()
 }

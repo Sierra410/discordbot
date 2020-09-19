@@ -2,7 +2,7 @@
 
 servicename=discordbot
 binf=/usr/local/bin/$servicename
-server=root@172.22.10.100
+server=root@172.22.0.100
 
 remote_start() {
         ssh "$server" "systemctl start $servicename"
