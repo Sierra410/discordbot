@@ -9,7 +9,7 @@ import (
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
 		adminOnly:   true,
-		chatType:    chatTypeDm,
+		chatType:    chatTypeAny,
 		command:     "adminctl",
 		helpMessage: "Usage:\n    add [userid...]\n    del [userid...]\n    list",
 		function:    commandAdminctl,
@@ -20,45 +20,57 @@ func commandAdminctl(self *explicitCommand, session *discordgo.Session, cmd *par
 	act := cmd.nthArgOr(0, "")
 
 	switch act {
-	case "add", "del":
-		ids, err := validateUserIds(session, cmd.args[1:])
-		if err != nil {
-			return "", errInvalidUserId
+	case "add", "del", "delete", "remove":
+		ids := validateUserIds(session, clearUserIDs(cmd.args[1:]))
+		removeFromStringSlice(ids, cmd.message.Author.ID)
+
+		if len(ids) == 0 {
+			return "", nil
+		}
+
+		// Explicit locking and unlocking due to UnsafeSet and UnsafeGet usage
+		cfg.cfg.Lock()
+		defer cfg.cfg.Unlock()
+
+		admins := []string{}
+		adminsInterface := cfg.UnsafeGet(cmd.message.GuildID, configAdmins)
+		switch x := adminsInterface.(type) {
+		case []interface{}:
+			admins = interfaceSliceToStringSlice(x)
+		case []string:
+			admins = x
 		}
 
 		if act == "add" {
-			// add
-			newAdmins := cfg.Admins
+			admins = append(admins, ids...)
 
-			for _, x := range ids {
-				if !isStringInSlice(x, newAdmins) {
-					newAdmins = append(newAdmins, x)
-				}
-			}
+			cfg.UnsafeSet(cmd.message.GuildID, configAdmins, admins)
 
-			cfg.Admins = newAdmins
+			return "Added:\n" + strings.Join(idsToMentions(ids), "\n"), nil
 		} else {
-			// del
-			newAdmins := []string{}
+			removed := []string{}
+			admins, removed = removeFromStringSlice(admins, ids...)
 
-			for _, x := range cfg.Admins {
-				if !isStringInSlice(x, ids) {
-					newAdmins = append(newAdmins, x)
-				}
+			cfg.UnsafeSet(cmd.message.GuildID, configAdmins, admins)
+
+			if len(removed) != 0 {
+				return "Removed:\n" + strings.Join(idsToMentions(removed), "\n"), nil
 			}
 
-			cfg.Admins = newAdmins
-		}
-
-		err = cfg.Save()
-		if err != nil {
-			return "", err
+			return "", nil
 		}
 	case "list":
-		// To do: Username. Long list safety.
+		admins := interfaceSliceToStringSlice(
+			interfaceToInterfaceSlice(
+				cfg.Get(cmd.message.GuildID, configAdmins),
+			),
+		)
+
 		b := strings.Builder{}
-		for _, x := range cfg.Admins {
-			b.WriteString(x)
+
+		b.WriteString("Admins:\n")
+		for _, x := range admins {
+			b.WriteString(interfaceToString(x))
 			b.WriteRune('\n')
 		}
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -27,15 +28,18 @@ func main() {
 	logInfo.Println("Config:", configFilePath)
 	logInfo.Println("Starting...")
 
+	cfg = NewConfig(configFilePath)
 	cfg.Load()
+	cfg.cfg.SetAutosaveTime(time.Second * 15)
 
-	if cfg.Token == "" {
+	token := interfaceToString(cfg.Get("", "Token"))
+	if token == "" {
 		logErr.Println("No token!")
 		os.Exit(1)
 	}
 
 	//Session
-	session, err := discordgo.New("Bot " + cfg.Token)
+	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		panic(err)
 	}

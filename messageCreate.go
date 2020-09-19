@@ -11,19 +11,14 @@ func messageCreate(session *discordgo.Session, data *discordgo.MessageCreate) {
 		return
 	}
 
-	prefix, ok := cfg.GetPerServerConfig(data.GuildID)["CommandPrefix"].(string)
-	if !ok {
-		prefix = cfg.DefaultCommandPrefix
-	}
-
-	cmd, err := parseCommand(msg, prefix)
+	cmd, err := parseCommand(session, msg)
 	switch err {
 	case nil:
 		_ = cmd.execute(session)
 	case errArgsParseFailed:
 		sendMultiMessage(session, msg.ChannelID, err.Error())
 	case errNotCommand:
-		isa := cfg.IsAdmin(msg.Author.ID)
+		isa := cfg.IsAdmin(session, msg.GuildID, msg.Author.ID)
 		for _, ic := range implicitCommands {
 			if ic.adminOnly && !isa {
 				continue

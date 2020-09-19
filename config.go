@@ -1,100 +1,141 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-	"sync"
+	"local/discordbot/config"
+
+	"github.com/bwmarrin/discordgo"
+)
+
+const (
+	configStatus        = "Status"
+	configAdmins        = "Admins"
+	configCommandPrefix = "CommandPrefix"
+
+	configDefaultCommandPrefix = "!"
 )
 
 var configFilePath = "config.json"
-var cfg = &Config{}
+var cfg Config
 
 type Config struct {
-	lock sync.Mutex
-
-	Token                string
-	Status               string
-	DefaultCommandPrefix string
-	Admins               []string
-
-	PerServerConfig map[string]*PerServerConfig
+	cfg config.Config
 }
 
-func (self *Config) fillBlanks() {
-	self.lock.Lock()
-
-	if self.DefaultCommandPrefix == "" {
-		self.DefaultCommandPrefix = "!"
+func NewConfig(path string) Config {
+	return Config{
+		cfg: config.NewConfig(path),
 	}
-
-	if self.Admins == nil {
-		self.Admins = []string{}
-	}
-
-	if self.PerServerConfig == nil {
-		self.PerServerConfig = map[string]*PerServerConfig{}
-	}
-
-	self.lock.Unlock()
 }
 
-func (self *Config) GetPerServerConfig(id string) *PerServerConfig {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+func (self *Config) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
+	self.RLock()
+	defer self.RUnlock()
 
-	c, ok := self.PerServerConfig[id]
-	if !ok {
-		c = &PerServerConfig{}
-		self.PerServerConfig[id] = c
+	admins := interfaceToInterfaceSlice(self.Get("", configAdmins))
+	if isInSlice(id, admins) {
+		return true
 	}
 
-	return c
+	admins = interfaceToInterfaceSlice(self.Get(guildId, configAdmins))
+	if isInSlice(id, admins) {
+		return true
+	}
+
+	guild, err := session.Guild(guildId)
+	return err == nil && guild.OwnerID == id
+}
+
+func (self *Config) SetPrefix(guildId string, prefix string) string {
+	return self.Set(guildId, configCommandPrefix, prefix).(string)
+}
+
+func (self *Config) GetPrefix(guildId string) string {
+	if guildId == "" {
+		return ""
+	}
+
+	p := interfaceToString(
+		self.Get(guildId, configCommandPrefix),
+	)
+
+	if p != "" {
+		return p
+	}
+
+	p = interfaceToString(
+		self.Get("", configCommandPrefix),
+	)
+
+	if p != "" {
+		return p
+	}
+
+	cfg.Set("", configCommandPrefix, configDefaultCommandPrefix)
+
+	return configDefaultCommandPrefix
+}
+
+func (self *Config) GetOr(guildId string, k string, def interface{}) interface{} {
+	x := self.Get(guildId, k)
+	if x == nil {
+		return def
+	}
+
+	return x
+}
+
+func (self *Config) Get(guildId string, k string) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.Get(k)
+}
+
+func (self *Config) UnsafeGet(guildId string, k string) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.UnsafeGet(k)
+}
+
+func (self *Config) Set(guildId string, k string, v interface{}) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.Set(k, v)
+}
+
+func (self *Config) UnsafeSet(guildId string, k string, v interface{}) interface{} {
+	if guildId != "" {
+		k = guildId + "_" + k
+	}
+
+	return self.cfg.UnsafeSet(k, v)
 }
 
 func (self *Config) Save() error {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	self.fillBlanks()
-	m, err := json.MarshalIndent(cfg, "", "\t")
-	if err != nil {
-		return nil
-	}
-
-	err = ioutil.WriteFile(configFilePath, m, 0640)
-
-	return err
+	return self.cfg.Save()
 }
 
 func (self *Config) Load() error {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	bytes, err := ioutil.ReadFile(configFilePath)
-
-	if os.IsNotExist(err) {
-		self.Save()
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(bytes, &cfg)
-	cfg.fillBlanks()
-
-	return err
+	return self.cfg.Load()
 }
 
-func (self *Config) IsAdmin(s string) bool {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+func (self *Config) Lock() {
+	self.cfg.Lock()
+}
 
-	for _, adminId := range cfg.Admins {
-		if s == adminId {
-			return true
-		}
-	}
+func (self *Config) Unlock() {
+	self.cfg.Unlock()
+}
 
-	return false
+func (self *Config) RLock() {
+	self.cfg.RLock()
+}
+
+func (self *Config) RUnlock() {
+	self.cfg.RUnlock()
 }

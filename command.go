@@ -49,11 +49,14 @@ type parsedCommand struct {
 	chatType int
 	isAdmin  bool
 	message  *discordgo.Message
+	prefix   string
 }
 
 // Parses a string (message content)
 // args are parsed as CSV with " " (space) instead of a comma
-func parseCommand(msg *discordgo.Message, prefix string) (*parsedCommand, error) {
+func parseCommand(session *discordgo.Session, msg *discordgo.Message) (*parsedCommand, error) {
+	prefix := cfg.GetPrefix(msg.GuildID)
+
 	if !strings.HasPrefix(msg.Content, prefix) {
 		return nil, errNotCommand
 	}
@@ -61,8 +64,9 @@ func parseCommand(msg *discordgo.Message, prefix string) (*parsedCommand, error)
 	cmd := &parsedCommand{
 		body:    "",
 		args:    []string{},
-		isAdmin: cfg.IsAdmin(msg.Author.ID),
+		isAdmin: cfg.IsAdmin(session, msg.GuildID, msg.Author.ID),
 		message: msg,
+		prefix:  prefix,
 	}
 
 	if msg.GuildID == "" {
