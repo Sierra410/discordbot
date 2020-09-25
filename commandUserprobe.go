@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -64,15 +65,87 @@ func commandUserprobe(self *explicitCommand, session *discordgo.Session, cmd *pa
 		[2]string{"Age", acAgeStr},
 	}
 
+	resp, _ := http.Get(u.AvatarURL("2048"))
+	defer resp.Body.Close()
+
+	pfpFile := &discordgo.File{
+		ContentType: "image/png",
+		Name:        u.ID + ".png",
+		Reader:      resp.Body,
+	}
+
+	dumpMsg, err := session.ChannelMessageSendComplex(
+		"758930968849154091",
+		&discordgo.MessageSend{
+			Files: []*discordgo.File{pfpFile},
+		},
+	)
+
+	var embedImage *discordgo.MessageEmbedImage
+	if err == nil && len(dumpMsg.Attachments) > 0 {
+		embedImage = &discordgo.MessageEmbedImage{
+			URL: dumpMsg.Attachments[0].URL,
+		}
+	}
+
 	session.ChannelMessageSendEmbed(
 		cmd.message.ChannelID,
 		&discordgo.MessageEmbed{
 			Description: table.String(),
-			Image: &discordgo.MessageEmbedImage{
-				URL: u.AvatarURL("2048"),
-			},
+			Image:       embedImage,
 		},
 	)
 
 	return "", nil
 }
+
+// var pfpFile *discordgo.File
+// pfpImage, err := session.UserAvatarDecode(u)
+
+// logDebug.Println("A")
+
+// if err == nil {
+// 	r, w := io.Pipe()
+
+// 	go func() {
+// 		png.Encode(w, pfpImage)
+// 		w.Close()
+// 	}()
+
+// 	pfpFile = &discordgo.File{
+// 		ContentType: "image/png",
+// 		Name:        u.ID + ".png",
+// 		Reader:      r,
+// 	}
+// }
+
+// logDebug.Println("B")
+
+// dumpMsg, err := session.ChannelMessageSendComplex(
+// 	"758930968849154091",
+// 	&discordgo.MessageSend{
+// 		Files: []*discordgo.File{pfpFile},
+// 	},
+// )
+
+// logDebug.Println("C")
+
+// pfpUrl := ""
+// if err == nil {
+// 	pfpUrl = dumpMsg.Attachments[0].URL
+// } else {
+// 	// Just in case
+// 	pfpUrl = u.AvatarURL("2048")
+// }
+
+// session.ChannelMessageSendEmbed(
+// 	cmd.message.ChannelID,
+// 	&discordgo.MessageEmbed{
+// 		Description: table.String(),
+// 		Image: &discordgo.MessageEmbedImage{
+// 			URL: pfpUrl,
+// 		},
+// 	},
+// )
+
+// return "", nil
