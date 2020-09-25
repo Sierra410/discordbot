@@ -4,6 +4,11 @@ servicename=discordbot
 binf=/usr/local/bin/$servicename
 server=root@172.22.0.100
 
+build() {
+        CGO_ENABLED=0 go build "$@"
+        return $?
+}
+
 remote_start() {
         ssh "$server" "systemctl start $servicename"
 }
@@ -17,7 +22,7 @@ deploy() {
 
         set -e
 
-        go build -o "$tmp"
+        build -o "$tmp"
         onexit() {
                 rm "$tmp"
                 remote_start
@@ -29,6 +34,9 @@ deploy() {
 }
 
 case $1 in
+build)
+        build
+        ;;
 start)
         remote_start
         ;;
