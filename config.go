@@ -1,7 +1,7 @@
 package main
 
 import (
-	"local/discordbot/config"
+	"discordbot/config"
 
 	"github.com/bwmarrin/discordgo"
 )
