@@ -18,7 +18,7 @@ remote_stop() {
 }
 
 deploy() {
-        tmp=$(mktemp /tmp/httpserver_XXXXXXXX)
+        tmp=$(mktemp /tmp/dicordbot_XXXXXXXX)
 
         set -e
 

@@ -84,6 +84,7 @@ func parseCommand(session *discordgo.Session, msg *discordgo.Message) (*parsedCo
 	if len(fields) > 1 {
 		r := csv.NewReader(strings.NewReader(fields[1]))
 		r.Comma = ' '
+		r.TrimLeadingSpace = true
 
 		var err error
 		cmd.args, err = r.Read()

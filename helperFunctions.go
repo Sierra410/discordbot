@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"regexp"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -100,6 +101,16 @@ func validateUserIds(session *discordgo.Session, userids []string) []string {
 	return valid
 }
 
+func isDigits(s string) bool {
+	for _, x := range s {
+		if x < '0' || x > '9' {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Removes <@ and >, if present. Does not validate the id.
 func clearUserIDs(s []string) []string {
 	newSlice := make([]string, len(s))
@@ -111,13 +122,21 @@ func clearUserIDs(s []string) []string {
 	return newSlice
 }
 
+var clearUserIDrule = regexp.MustCompile(`^\s*<@!?(\d+)>\s*$`)
+
 // Removes <@ and >, if present. Does not validate the id.
 func clearUserID(s string) string {
-	if s[0:2] == "<@" && s[len(s)-1] == '>' {
-		s = s[2 : len(s)-1]
+	if isDigits(s) {
+		return s
 	}
 
-	return s
+	r := clearUserIDrule.FindAllStringSubmatch(s, 1)
+
+	if r == nil || len(r) != 1 || len(r[0]) != 2 {
+		return ""
+	}
+
+	return r[0][1]
 }
 
 // Generic stuff
