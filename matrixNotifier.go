@@ -58,12 +58,16 @@ func matrixChatWatchdog(session *discordgo.Session, homeserver, username, passwo
 		age := eventAge(evt.Timestamp)
 		reportChannel, _ := channels[string(evt.RoomID)].(string)
 
-		if age < 30 && reportChannel != "" {
+		if age < 60 && reportChannel != "" {
+			message := fmt.Sprintf("**%s** sent a message in **Matrix**", string(evt.Sender))
+			logInfo.Println(message, "[", age, "]")
 			session.ChannelMessageSend(
 				reportChannel,
-				"New message in Matrix from "+string(evt.Sender),
+				message,
 			)
 		}
+
+		client.MarkRead(evt.RoomID, evt.ID)
 	}
 
 	syncer.OnEventType(
