@@ -114,7 +114,7 @@ func (self *Table) InsertLine(line [2]string, i int) {
 	n := make([][2]string, len(self.Lines)+1)
 	n[i] = line
 	copy(n[:i], self.Lines[:i])
-	copy(n[i+1:len(n)], self.Lines[i:len(n)-1])
+	copy(n[i+1:], self.Lines[i:len(n)-1])
 
 	self.Lines = n
 }

@@ -54,19 +54,21 @@ func commandUserprobe(self *explicitCommand, session *discordgo.Session, cmd *pa
 	}
 
 	table.Lines = [][2]string{
-		[2]string{"User", "<@" + u.ID + ">"},
-		[2]string{
+		{"User", "<@" + u.ID + ">"},
+		{
 			"Cur.",
 			"**``" + strings.ReplaceAll(u.Username, "`", "\\`") +
 				"#" + u.Discriminator + "``**",
 		},
-		[2]string{"ID", u.ID},
-		[2]string{"Reg", acDate.Format("**2006-01-02 15:04:05 UTC**")},
-		[2]string{"Age", acAgeStr},
+		{"ID", u.ID},
+		{"Reg", acDate.Format("**2006-01-02 15:04:05 UTC**")},
+		{"Age", acAgeStr},
 	}
 
-	resp, _ := http.Get(u.AvatarURL("2048"))
-	defer resp.Body.Close()
+	resp, err := http.Get(u.AvatarURL("2048"))
+	if err == nil {
+		defer resp.Body.Close()
+	}
 
 	pfpFile := &discordgo.File{
 		ContentType: "image/png",
