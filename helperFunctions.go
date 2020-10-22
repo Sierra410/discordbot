@@ -2,9 +2,9 @@ package main
 
 import (
 	"reflect"
+	"regexp"
 	"strconv"
 	"time"
-	"regexp"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -156,15 +156,15 @@ func joinSlicesOfStrings(a []string, b []string) []string {
 	return new
 }
 
-// func isStringInSlice(s string, sl []string) bool {
-// 	for _, x := range sl {
-// 		if x == s {
-// 			return true
-// 		}
-// 	}
+func isStringInSlice(s string, sl []string) bool {
+	for _, x := range sl {
+		if x == s {
+			return true
+		}
+	}
 
-// 	return false
-// }
+	return false
+}
 
 func isInSlice(i interface{}, s []interface{}) bool {
 	for _, x := range s {

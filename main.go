@@ -50,7 +50,7 @@ func main() {
 		logInfo.Println("Userid: ", ownId)
 
 		for _, x := range readyCallbacks {
-			x(session, data)
+			go x(session, data)
 		}
 	})
 
