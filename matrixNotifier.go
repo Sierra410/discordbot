@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -52,33 +53,59 @@ func matrixChatWatchdog(session *discordgo.Session, homeserver, username, passwo
 		return err
 	}
 
-	syncer := client.Syncer.(*mautrix.DefaultSyncer)
+	// Not scalable! Will work weirdly with more than 1 channel!
+	var (
+		lock        = sync.Mutex{}
+		lastSender  = ""
+		sent        = 0
+		lastMessage *discordgo.Message
+	)
 
 	var f = func(source mautrix.EventSource, evt *event.Event) {
 		age := eventAge(evt.Timestamp)
 		reportChannel, _ := channels[string(evt.RoomID)].(string)
 
 		if age < 60 && reportChannel != "" {
-			message := fmt.Sprintf("**%s** sent a message in **Matrix**", string(evt.Sender))
-			logInfo.Println(message, "[", age, "]")
-			session.ChannelMessageSend(
-				reportChannel,
-				message,
-			)
+			sender := string(evt.Sender)
+
+			lock.Lock()
+
+			if lastSender != sender {
+				sent = 0
+				lastSender = sender
+			}
+
+			sent++
+
+			logInfo.Printf("%s n%d %ds.", sender, sent, age)
+
+			if sent == 1 {
+				lastMessage, _ = session.ChannelMessageSend(
+					reportChannel,
+					fmt.Sprintf("**%s** sent a message in **Matrix**", sender),
+				)
+
+				lock.Unlock()
+			} else if lastMessage != nil {
+				lock.Unlock()
+
+				session.ChannelMessageEdit(
+					lastMessage.ChannelID,
+					lastMessage.ID,
+					fmt.Sprintf("**%s** sent %d messages in **Matrix**", sender, sent),
+				)
+			} else {
+				lock.Unlock()
+			}
 		}
 
 		client.MarkRead(evt.RoomID, evt.ID)
 	}
 
-	syncer.OnEventType(
-		event.EventMessage,
-		f,
-	)
+	syncer := client.Syncer.(*mautrix.DefaultSyncer)
 
-	syncer.OnEventType(
-		event.EventEncrypted,
-		f,
-	)
+	syncer.OnEventType(event.EventMessage, f)
+	syncer.OnEventType(event.EventEncrypted, f)
 
 	return client.Sync()
 }
