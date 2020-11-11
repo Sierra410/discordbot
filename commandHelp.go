@@ -8,7 +8,7 @@ import (
 
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
-		adminOnly:   false,
+		permLevel:   botPermNone,
 		chatType:    chatTypeAny,
 		command:     "help",
 		helpMessage: "Yes",

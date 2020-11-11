@@ -30,8 +30,18 @@ var (
 	errCommandAlreadyExists = errors.New("Command already exists!")
 )
 
+type botPermissionLevel int
+
+const (
+	botPermNone = botPermissionLevel(iota)
+	botPermServerAdmin
+	botPermServerOwner
+	botPermBotAdmin
+	botPermBotOwner
+)
+
 type explicitCommand struct {
-	adminOnly           bool
+	permLevel           botPermissionLevel
 	chatType            int
 	command             string
 	accessDeniedMessage string // None, if empty
@@ -43,13 +53,13 @@ type explicitCommand struct {
 }
 
 type parsedCommand struct {
-	command  string
-	args     []string
-	body     string
-	chatType int
-	isAdmin  bool
-	message  *discordgo.Message
-	prefix   string
+	command   string
+	args      []string
+	body      string
+	chatType  int
+	permLevel botPermissionLevel
+	message   *discordgo.Message
+	prefix    string
 }
 
 // Parses a string (message content)
@@ -62,11 +72,11 @@ func parseCommand(session *discordgo.Session, msg *discordgo.Message) (*parsedCo
 	}
 
 	cmd := &parsedCommand{
-		body:    "",
-		args:    []string{},
-		isAdmin: cfg.IsAdmin(session, msg.GuildID, msg.Author.ID),
-		message: msg,
-		prefix:  prefix,
+		body:      "",
+		args:      []string{},
+		permLevel: cfg.GetPermissionLevel(session, msg.GuildID, msg.Author.ID),
+		message:   msg,
+		prefix:    prefix,
 	}
 
 	if msg.GuildID == "" {
@@ -143,8 +153,8 @@ func (self *parsedCommand) execute(session *discordgo.Session) error {
 }
 
 func (self *parsedCommand) hasAccess(ec *explicitCommand) bool {
-	return !((ec.chatType != 0 && ec.chatType != self.chatType) ||
-		(ec.adminOnly && !self.isAdmin))
+	return (ec.chatType == chatTypeAny || ec.chatType == self.chatType) &&
+		self.permLevel >= ec.permLevel
 }
 
 type implicitCommand struct {

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 //
@@ -126,9 +127,9 @@ func (self *Table) String() string {
 	)
 
 	for _, x := range self.Lines {
-		if len(x[0]) > max {
-			max = len(x[0])
-			l += len(x[1])
+		if utf8.RuneCountInString(x[0]) > max {
+			max = utf8.RuneCountInString(x[0])
+			l += utf8.RuneCountInString(x[1])
 		}
 	}
 
@@ -139,7 +140,7 @@ func (self *Table) String() string {
 		b.WriteString(self.Fmtfunc(
 			x[0],
 			x[1],
-			strings.Repeat(" ", max-len(x[0])),
+			strings.Repeat(" ", max-utf8.RuneCountInString(x[0])),
 		))
 		b.WriteRune('\n')
 	}

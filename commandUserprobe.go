@@ -11,7 +11,7 @@ import (
 
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
-		adminOnly:   false,
+		permLevel:   botPermNone,
 		chatType:    chatTypeAny,
 		command:     "userprobe",
 		helpMessage: "Usage: userprobe userid",

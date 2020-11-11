@@ -4,8 +4,8 @@ import "github.com/bwmarrin/discordgo"
 
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
-		adminOnly:   true,
-		chatType:    chatTypeDm,
+		permLevel:   botPermBotAdmin,
+		chatType:    chatTypeAny,
 		command:     "config",
 		helpMessage: "Usage: config reload",
 		function:    commandConfig,

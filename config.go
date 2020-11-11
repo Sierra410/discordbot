@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	configBotOwner      = "BotOwner"
 	configStatus        = "Status"
 	configAdmins        = "Admins"
 	configCommandPrefix = "CommandPrefix"
@@ -28,21 +29,44 @@ func NewConfig(path string) Config {
 }
 
 func (self *Config) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
-	self.RLock()
-	defer self.RUnlock()
+	return self.GetPermissionLevel(session, guildId, id) != botPermNone
+}
 
-	admins := interfaceToInterfaceSlice(self.Get("", configAdmins))
-	if isInSlice(id, admins) {
-		return true
+func (self *Config) GetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
+	self.cfg.Lock()
+	defer self.cfg.Unlock()
+
+	return self.UnsafeGetPermissionLevel(session, guildId, id)
+}
+
+func (self *Config) UnsafeGetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
+	botOwner := cfg.UnsafeGetOr("", configBotOwner, "").(string)
+	if botOwner != "" && id == botOwner {
+		return botPermBotOwner
 	}
 
-	admins = interfaceToInterfaceSlice(self.Get(guildId, configAdmins))
+	admins := interfaceToInterfaceSlice(self.UnsafeGet("", configAdmins))
 	if isInSlice(id, admins) {
-		return true
+		return botPermBotAdmin
 	}
 
-	guild, err := session.Guild(guildId)
-	return err == nil && guild.OwnerID == id
+	if guildId != "" {
+		guild, err := session.Guild(guildId)
+		if err != nil {
+			panic(err)
+		}
+
+		if guild.OwnerID == id {
+			return botPermServerOwner
+		}
+
+		admins = interfaceToInterfaceSlice(self.UnsafeGet(guildId, configAdmins))
+		if isInSlice(id, admins) {
+			return botPermServerAdmin
+		}
+	}
+
+	return botPermNone
 }
 
 func (self *Config) SetPrefix(guildId string, prefix string) string {
@@ -77,6 +101,15 @@ func (self *Config) GetPrefix(guildId string) string {
 
 func (self *Config) GetOr(guildId string, k string, def interface{}) interface{} {
 	x := self.Get(guildId, k)
+	if x == nil {
+		return def
+	}
+
+	return x
+}
+
+func (self *Config) UnsafeGetOr(guildId string, k string, def interface{}) interface{} {
+	x := self.UnsafeGet(guildId, k)
 	if x == nil {
 		return def
 	}

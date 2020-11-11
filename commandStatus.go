@@ -8,8 +8,8 @@ func init() {
 	})
 
 	mustAddExplicitCommand(&explicitCommand{
-		adminOnly:   true,
-		chatType:    chatTypeDm,
+		permLevel:   botPermBotAdmin,
+		chatType:    chatTypeAny,
 		command:     "setstatus",
 		helpMessage: "Usage: setstatus g/l/s/w\n    status",
 		function:    commandStatus,

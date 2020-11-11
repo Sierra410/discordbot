@@ -9,7 +9,7 @@ import (
 
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
-		adminOnly:   true,
+		permLevel:   botPermServerAdmin,
 		chatType:    chatTypeAny,
 		command:     "setprefix",
 		helpMessage: "Usage: setprefix newprefix",

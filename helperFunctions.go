@@ -322,6 +322,17 @@ func interfaceToInterfaceSlice(i interface{}) []interface{} {
 	}
 }
 
+func interfaceToStringSlice(i interface{}) []string {
+	switch x := i.(type) {
+	case []interface{}:
+		return interfaceSliceToStringSlice(x)
+	case []string:
+		return x
+	default:
+		return []string{}
+	}
+}
+
 func interfaceSliceToStringSlice(i []interface{}) []string {
 	newSlice := make([]string, 0, cap(i))
 
