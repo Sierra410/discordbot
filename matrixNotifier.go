@@ -11,31 +11,29 @@ import (
 )
 
 func init() {
-	addReadyCallback(matrixChatWatchdogLoop)
+	addReadyCallback(matrixChatWatchdog)
 }
 
-func matrixChatWatchdogLoop(session *discordgo.Session, data *discordgo.Ready) {
+func matrixChatWatchdog(session *discordgo.Session, ready *discordgo.Ready) {
 	prefix := "matrix"
 	homeserver := cfg.GetOr(prefix, "homeserver", "matrix.org").(string)
 	username := cfg.Get(prefix, "username").(string)
 	password := cfg.Get(prefix, "password").(string)
-	channels := cfg.Get(prefix, "channels").(map[string]interface{})
+	channels := map[string]string{}
 
-	for {
-		logErr.Println(
-			matrixChatWatchdog(session, homeserver, username, password, channels),
-			"\nRestarting Matrix client in 10 seconds...",
-		)
-		time.Sleep(time.Second * 10)
+	for k, v := range cfg.Get(prefix, "channels").(map[string]interface{}) {
+		switch v := v.(type) {
+		case string:
+			channels[k] = v
+		}
 	}
-}
 
-func matrixChatWatchdog(session *discordgo.Session, homeserver, username, password string, channels map[string]interface{}) error {
 	fmt.Printf("MATRIX: %s@%s\n", username, homeserver)
 
 	client, err := mautrix.NewClient(homeserver, "", "")
 	if err != nil {
-		return err
+		logErr.Println(err)
+		return
 	}
 
 	_, err = client.Login(
@@ -50,7 +48,8 @@ func matrixChatWatchdog(session *discordgo.Session, homeserver, username, passwo
 		},
 	)
 	if err != nil {
-		return err
+		logErr.Panicln(err)
+		return
 	}
 
 	// Not scalable! Will work weirdly with more than 1 channel!
@@ -63,7 +62,7 @@ func matrixChatWatchdog(session *discordgo.Session, homeserver, username, passwo
 
 	var f = func(source mautrix.EventSource, evt *event.Event) {
 		age := eventAge(evt.Timestamp)
-		reportChannel, _ := channels[string(evt.RoomID)].(string)
+		reportChannel, _ := channels[string(evt.RoomID)]
 
 		if age < 60 && reportChannel != "" {
 			sender := string(evt.Sender)
@@ -107,7 +106,7 @@ func matrixChatWatchdog(session *discordgo.Session, homeserver, username, passwo
 	syncer.OnEventType(event.EventMessage, f)
 	syncer.OnEventType(event.EventEncrypted, f)
 
-	return client.Sync()
+	logErr.Println(client.Sync())
 }
 
 func eventAge(timestamp int64) int64 {
