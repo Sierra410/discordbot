@@ -35,12 +35,12 @@ func commandAdminctl(self *explicitCommand, session *discordgo.Session, cmd *par
 		}
 
 		// Explicit locking and unlocking due to UnsafeSet and UnsafeGet usage
-		cfg.cfg.Lock()
-		defer cfg.cfg.Unlock()
+		cfg := cfg.Lock(true)
+		defer cfg.Drop()
 
-		admins := interfaceToStringSlice(cfg.UnsafeGet(cmd.message.GuildID, configAdmins))
+		admins := interfaceToStringSlice(cfg.Get(cmd.message.GuildID, configAdmins))
 
-		idsPermLevel := cfg.UnsafeGetPermissionLevel(session, cmd.message.GuildID, id)
+		idsPermLevel := cfg.GetPermissionLevel(session, cmd.message.GuildID, id)
 
 		if act == "add" {
 			if idsPermLevel > botPermNone {
@@ -49,7 +49,7 @@ func commandAdminctl(self *explicitCommand, session *discordgo.Session, cmd *par
 
 			admins = append(admins, id)
 
-			cfg.UnsafeSet(cmd.message.GuildID, configAdmins, admins)
+			cfg.Set(cmd.message.GuildID, configAdmins, admins)
 
 			return "Added " + idToMention(id), nil
 		} else {
@@ -62,7 +62,7 @@ func commandAdminctl(self *explicitCommand, session *discordgo.Session, cmd *par
 			}
 
 			admins, _ := removeFromStringSlice(admins, id)
-			cfg.UnsafeSet(cmd.message.GuildID, configAdmins, admins)
+			cfg.Set(cmd.message.GuildID, configAdmins, admins)
 
 			return "Removed " + idToMention(id), nil
 		}

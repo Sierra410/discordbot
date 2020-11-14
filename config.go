@@ -15,37 +15,34 @@ const (
 	configDefaultCommandPrefix = "!"
 )
 
+type ConfigInterface interface {
+	Get(guildId string, key string) interface{}
+	GetOr(guildId string, key string, value interface{}) interface{}
+	Set(guildId string, key string, value interface{}) interface{}
+	Save() error
+	Load() error
+}
+
 var configFilePath = "config.json"
 var cfg Config
 
-type Config struct {
-	cfg config.Config
-}
+// Extended behavior;
 
-func NewConfig(path string) Config {
-	return Config{
-		cfg: config.NewConfig(path),
+func toConfigKey(guildId, key string) string {
+	if guildId == "" {
+		return key
 	}
+
+	return guildId + "_" + key
 }
 
-func (self *Config) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
-	return self.GetPermissionLevel(session, guildId, id) != botPermNone
-}
-
-func (self *Config) GetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
-	self.cfg.Lock()
-	defer self.cfg.Unlock()
-
-	return self.UnsafeGetPermissionLevel(session, guildId, id)
-}
-
-func (self *Config) UnsafeGetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
-	botOwner := cfg.UnsafeGetOr("", configBotOwner, "").(string)
+func getPermissionLevel(config ConfigInterface, session *discordgo.Session, guildId string, id string) botPermissionLevel {
+	botOwner := cfg.GetOr("", configBotOwner, "").(string)
 	if botOwner != "" && id == botOwner {
 		return botPermBotOwner
 	}
 
-	admins := interfaceToInterfaceSlice(self.UnsafeGet("", configAdmins))
+	admins := interfaceToInterfaceSlice(config.Get("", configAdmins))
 	if isInSlice(id, admins) {
 		return botPermBotAdmin
 	}
@@ -60,7 +57,7 @@ func (self *Config) UnsafeGetPermissionLevel(session *discordgo.Session, guildId
 			return botPermServerOwner
 		}
 
-		admins = interfaceToInterfaceSlice(self.UnsafeGet(guildId, configAdmins))
+		admins = interfaceToInterfaceSlice(config.Get(guildId, configAdmins))
 		if isInSlice(id, admins) {
 			return botPermServerAdmin
 		}
@@ -69,17 +66,22 @@ func (self *Config) UnsafeGetPermissionLevel(session *discordgo.Session, guildId
 	return botPermNone
 }
 
-func (self *Config) SetPrefix(guildId string, prefix string) string {
-	return self.Set(guildId, configCommandPrefix, prefix).(string)
+func isAdmin(config ConfigInterface, session *discordgo.Session, guildId string, id string) bool {
+	return getPermissionLevel(config, session, guildId, id) != botPermNone
 }
 
-func (self *Config) GetPrefix(guildId string) string {
+func setPrefix(config ConfigInterface, guildId string, prefix string) string {
+	return config.Set(guildId, configCommandPrefix, prefix).(string)
+}
+
+func getPrefix(config ConfigInterface, guildId string) string {
+	// No prefix in DM
 	if guildId == "" {
 		return ""
 	}
 
 	p := interfaceToString(
-		self.Get(guildId, configCommandPrefix),
+		config.Get(guildId, configCommandPrefix),
 	)
 
 	if p != "" {
@@ -87,66 +89,59 @@ func (self *Config) GetPrefix(guildId string) string {
 	}
 
 	p = interfaceToString(
-		self.Get("", configCommandPrefix),
+		config.Get("", configCommandPrefix),
 	)
 
 	if p != "" {
 		return p
 	}
 
-	cfg.Set("", configCommandPrefix, configDefaultCommandPrefix)
+	config.Set("", configCommandPrefix, configDefaultCommandPrefix)
 
 	return configDefaultCommandPrefix
 }
 
-func (self *Config) GetOr(guildId string, k string, def interface{}) interface{} {
-	x := self.Get(guildId, k)
-	if x == nil {
-		return def
-	}
-
-	return x
+// Config is a simple key:value storage with several Discordgo specific helper funciton
+type Config struct {
+	cfg config.Config
 }
 
-func (self *Config) UnsafeGetOr(guildId string, k string, def interface{}) interface{} {
-	x := self.UnsafeGet(guildId, k)
-	if x == nil {
-		return def
+func NewConfig(path string) Config {
+	return Config{
+		cfg: config.NewConfig(path),
 	}
+}
 
-	return x
+// Extension
+
+func (self *Config) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
+	return isAdmin(self, session, guildId, id)
+}
+
+func (self *Config) GetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
+	return getPermissionLevel(self, session, guildId, id)
+}
+
+func (self *Config) SetPrefix(guildId string, prefix string) string {
+	return setPrefix(self, guildId, prefix)
+}
+
+func (self *Config) GetPrefix(guildId string) string {
+	return getPrefix(self, guildId)
+}
+
+// DefaultsConfig
+
+func (self *Config) Set(guildId string, k string, v interface{}) interface{} {
+	return self.cfg.Set(toConfigKey(guildId, k), v)
 }
 
 func (self *Config) Get(guildId string, k string) interface{} {
-	if guildId != "" {
-		k = guildId + "_" + k
-	}
-
-	return self.cfg.Get(k)
+	return self.cfg.Get(toConfigKey(guildId, k))
 }
 
-func (self *Config) UnsafeGet(guildId string, k string) interface{} {
-	if guildId != "" {
-		k = guildId + "_" + k
-	}
-
-	return self.cfg.UnsafeGet(k)
-}
-
-func (self *Config) Set(guildId string, k string, v interface{}) interface{} {
-	if guildId != "" {
-		k = guildId + "_" + k
-	}
-
-	return self.cfg.Set(k, v)
-}
-
-func (self *Config) UnsafeSet(guildId string, k string, v interface{}) interface{} {
-	if guildId != "" {
-		k = guildId + "_" + k
-	}
-
-	return self.cfg.UnsafeSet(k, v)
+func (self *Config) GetOr(guildId string, k string, def interface{}) interface{} {
+	return self.cfg.GetOr(toConfigKey(guildId, k), def)
 }
 
 func (self *Config) Save() error {
@@ -157,18 +152,56 @@ func (self *Config) Load() error {
 	return self.cfg.Load()
 }
 
-func (self *Config) Lock() {
-	self.cfg.Lock()
+func (self *Config) Lock(writing bool) *ConfigHandle {
+	return &ConfigHandle{
+		handle: self.cfg.Lock(writing),
+	}
 }
 
-func (self *Config) Unlock() {
-	self.cfg.Unlock()
+type ConfigHandle struct {
+	handle *config.Handle
 }
 
-func (self *Config) RLock() {
-	self.cfg.RLock()
+// Extension
+
+func (self *ConfigHandle) IsAdmin(session *discordgo.Session, guildId string, id string) bool {
+	return isAdmin(self, session, guildId, id)
 }
 
-func (self *Config) RUnlock() {
-	self.cfg.RUnlock()
+func (self *ConfigHandle) GetPermissionLevel(session *discordgo.Session, guildId string, id string) botPermissionLevel {
+	return getPermissionLevel(self, session, guildId, id)
+}
+
+func (self *ConfigHandle) SetPrefix(guildId string, prefix string) string {
+	return setPrefix(self, guildId, prefix)
+}
+
+func (self *ConfigHandle) GetPrefix(guildId string) string {
+	return getPrefix(self, guildId)
+}
+
+// Defaults
+
+func (self *ConfigHandle) Drop() {
+	self.handle.Drop()
+}
+
+func (self *ConfigHandle) Set(g, k string, v interface{}) interface{} {
+	return self.handle.Set(toConfigKey(g, k), v)
+}
+
+func (self *ConfigHandle) Get(g, k string) interface{} {
+	return self.handle.Get(toConfigKey(g, k))
+}
+
+func (self *ConfigHandle) GetOr(g, k string, def interface{}) interface{} {
+	return self.handle.GetOr(toConfigKey(g, k), def)
+}
+
+func (self *ConfigHandle) Save() error {
+	return self.handle.Save()
+}
+
+func (self *ConfigHandle) Load() error {
+	return self.handle.Load()
 }

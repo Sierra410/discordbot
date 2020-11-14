@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+type ConfigInterface interface {
+	Get(string) interface{}
+	GetOr(string, interface{}) interface{}
+	Set(string, interface{}) interface{}
+	Save() error
+	Load() error
+}
+
 type Config struct {
 	lock sync.RWMutex
 	data map[string]interface{}
@@ -53,6 +61,10 @@ func (self *Config) Save() error {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
+	return self.unsafeSave()
+}
+
+func (self *Config) unsafeSave() error {
 	m, err := json.MarshalIndent(self.data, "", "\t")
 	if err != nil {
 		return nil
@@ -67,6 +79,10 @@ func (self *Config) Load() error {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
+	return self.unsafeLoad()
+}
+
+func (self *Config) unsafeLoad() error {
 	bytes, err := ioutil.ReadFile(self.path)
 
 	if os.IsNotExist(err) {
@@ -87,12 +103,10 @@ func (self *Config) Get(key string) interface{} {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
-	v, _ := self.data[key]
-
-	return v
+	return self.unsafeGet
 }
 
-func (self *Config) UnsafeGet(key string) interface{} {
+func (self *Config) unsafeGet(key string) interface{} {
 	v, _ := self.data[key]
 
 	return v
@@ -102,6 +116,10 @@ func (self *Config) GetOr(key string, def interface{}) interface{} {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
+	return self.unsafeGetOr(key, def)
+}
+
+func (self *Config) unsafeGetOr(key string, def interface{}) interface{} {
 	v, ok := self.data[key]
 	if !ok {
 		return def
@@ -114,6 +132,10 @@ func (self *Config) Set(key string, val interface{}) interface{} {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
+	return self.unsafeSet(key, val)
+}
+
+func (self *Config) unsafeSet(key string, val interface{}) interface{} {
 	current, _ := self.data[key]
 
 	self.data[key] = val
@@ -125,30 +147,72 @@ func (self *Config) Set(key string, val interface{}) interface{} {
 	return current
 }
 
-func (self *Config) UnsafeSet(key string, val interface{}) interface{} {
-	current, _ := self.data[key]
-
-	self.data[key] = val
-
-	if self.timer != nil {
-		self.timer.Reset(self.timerDuration)
+func (self *Config) Lock(writing bool) *Handle {
+	handle := &Handle{
+		lock:    sync.RWMutex{},
+		writing: writing,
+		cfg:     self,
 	}
 
-	return current
+	if writing {
+		self.lock.Lock()
+	} else {
+		self.lock.RLock()
+	}
+
+	return handle
 }
 
-func (self *Config) Lock() {
+type Handle struct {
+	lock    sync.RWMutex
+	writing bool
+	cfg     *Config
+}
+
+func (self *Handle) Drop() {
 	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	if self.writing {
+		self.cfg.lock.Unlock()
+	} else {
+		self.cfg.lock.RUnlock()
+	}
+
+	self.cfg = nil
 }
 
-func (self *Config) Unlock() {
-	self.lock.Unlock()
-}
-
-func (self *Config) RLock() {
+func (self *Handle) Get(key string) interface{} {
 	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	return self.cfg.unsafeGet(key)
 }
 
-func (self *Config) RUnlock() {
-	self.lock.RUnlock()
+func (self *Handle) GetOr(key string, def interface{}) interface{} {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	return self.cfg.unsafeGetOr(key, def)
+}
+
+func (self *Handle) Set(key string, val interface{}) interface{} {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	return self.cfg.unsafeSet(key, val)
+}
+
+func (self *Handle) Save() error {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	return self.cfg.unsafeSave()
+}
+
+func (self *Handle) Load() error {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	return self.cfg.unsafeLoad()
 }
