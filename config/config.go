@@ -103,7 +103,7 @@ func (self *Config) Get(key string) interface{} {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
-	return self.unsafeGet
+	return self.unsafeGet(key)
 }
 
 func (self *Config) unsafeGet(key string) interface{} {
