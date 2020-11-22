@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,18 +15,91 @@ func init() {
 	addReadyCallback(matrixChatWatchdog)
 }
 
+type recentMessage struct {
+	message *discordgo.Message
+	sender  string
+	sent    uint32
+}
+
+type recentMessages struct {
+	lock              sync.Mutex
+	timeout           time.Duration
+	messagesByChannel map[string]*recentMessage
+	cleanupDelay      map[string]*time.Timer
+}
+
+func newRecentMessages(timeoutSeconds time.Duration) *recentMessages {
+	return &recentMessages{
+		lock:              sync.Mutex{},
+		timeout:           time.Second * timeoutSeconds,
+		cleanupDelay:      map[string]*time.Timer{},
+		messagesByChannel: map[string]*recentMessage{},
+	}
+}
+
+func (self *recentMessages) getMostRecent(channelId string) *recentMessage {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	rm, ok := self.messagesByChannel[channelId]
+	if !ok {
+		return nil
+	}
+
+	return rm
+}
+
+func (self *recentMessages) addNewMessage(message *discordgo.Message, sender string, sent uint32) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	self.messagesByChannel[message.ChannelID] = &recentMessage{
+		sender:  sender,
+		message: message,
+		sent:    sent,
+	}
+
+	timer, ok := self.cleanupDelay[message.ChannelID]
+	if !ok {
+		self.cleanupDelay[message.ChannelID] = time.AfterFunc(
+			self.timeout,
+			func() {
+				self.lock.Lock()
+				defer self.lock.Unlock()
+
+				self.messagesByChannel[message.ChannelID] = nil
+			},
+		)
+	} else {
+		timer.Reset(self.timeout)
+	}
+}
+
+func (self *recentMessages) cleanUp() {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	for k, v := range self.messagesByChannel {
+		if v == nil {
+			continue
+		}
+
+		timeStamp, err := discordgo.SnowflakeTimestamp(v.message.ID)
+		if err != nil || time.Since(timeStamp) > self.timeout {
+			self.messagesByChannel[k] = nil
+		}
+	}
+}
+
 func matrixChatWatchdog(session *discordgo.Session, ready *discordgo.Ready) {
 	prefix := "matrix"
 	homeserver := cfg.GetOr(prefix, "homeserver", "matrix.org").(string)
 	username := cfg.Get(prefix, "username").(string)
 	password := cfg.Get(prefix, "password").(string)
-	channels := map[string]string{}
+	channels := map[string][]string{}
 
 	for k, v := range cfg.Get(prefix, "channels").(map[string]interface{}) {
-		switch v := v.(type) {
-		case string:
-			channels[k] = v
-		}
+		channels[k] = interfaceToStringSlice(v)
 	}
 
 	fmt.Printf("MATRIX: %s@%s\n", username, homeserver)
@@ -52,53 +126,40 @@ func matrixChatWatchdog(session *discordgo.Session, ready *discordgo.Ready) {
 		return
 	}
 
-	// Not scalable! Will work weirdly with more than 1 channel!
-	var (
-		lock        = sync.Mutex{}
-		lastSender  = ""
-		sent        = 0
-		lastMessage *discordgo.Message
-	)
+	recentMessages := newRecentMessages(60)
 
 	var f = func(source mautrix.EventSource, evt *event.Event) {
+		defer client.MarkRead(evt.RoomID, evt.ID)
+
 		age := eventAge(evt.Timestamp)
-		reportChannel, _ := channels[string(evt.RoomID)]
+		if age > 60 {
+			return
+		}
 
-		if age < 60 && reportChannel != "" {
-			sender := string(evt.Sender)
+		sender := string(evt.Sender)
+		reportChannels, _ := channels[string(evt.RoomID)]
 
-			lock.Lock()
+		logInfo.Printf("From %s to %v\n", sender, reportChannels)
 
-			if lastSender != sender {
-				sent = 0
-				lastSender = sender
-			}
-
-			sent++
-
-			logInfo.Printf("%s n%d %ds.", sender, sent, age)
-
-			if sent == 1 {
-				lastMessage, _ = session.ChannelMessageSend(
+		for _, reportChannel := range reportChannels {
+			rm := recentMessages.getMostRecent(reportChannel)
+			if rm == nil || rm.sender != sender {
+				message, _ := session.ChannelMessageSend(
 					reportChannel,
 					fmt.Sprintf("**%s** sent a message in **Matrix**", sender),
 				)
 
-				lock.Unlock()
-			} else if lastMessage != nil {
-				lock.Unlock()
+				recentMessages.addNewMessage(message, sender, 1)
+			} else {
+				atomic.AddUint32(&rm.sent, 1)
 
 				session.ChannelMessageEdit(
-					lastMessage.ChannelID,
-					lastMessage.ID,
-					fmt.Sprintf("**%s** sent %d messages in **Matrix**", sender, sent),
+					rm.message.ChannelID,
+					rm.message.ID,
+					fmt.Sprintf("**%s** sent %d messages in **Matrix**", sender, rm.sent),
 				)
-			} else {
-				lock.Unlock()
 			}
 		}
-
-		client.MarkRead(evt.RoomID, evt.ID)
 	}
 
 	syncer := client.Syncer.(*mautrix.DefaultSyncer)
