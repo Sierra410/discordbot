@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
 	"encoding/csv"
@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	chatTypeAny = iota
-	chatTypeDm
-	chatTypeServer
+	ChatTypeAny = iota
+	ChatTypeDm
+	ChatTypeServer
 )
 
 var (
@@ -30,8 +30,23 @@ var (
 	errCommandAlreadyExists = errors.New("Command already exists!")
 )
 
+<<<<<<< Updated upstream:command.go
 type explicitCommand struct {
 	adminOnly           bool
+=======
+type BotPermissionLevel int
+
+const (
+	BotPermNone = BotPermissionLevel(iota)
+	BotPermServerAdmin
+	BotPermServerOwner
+	BotPermBotAdmin
+	BotPermBotOwner
+)
+
+type explicitCommand struct {
+	permLevel           BotPermissionLevel
+>>>>>>> Stashed changes:bot/command.go
 	chatType            int
 	command             string
 	accessDeniedMessage string // None, if empty
@@ -43,6 +58,7 @@ type explicitCommand struct {
 }
 
 type parsedCommand struct {
+<<<<<<< Updated upstream:command.go
 	command  string
 	args     []string
 	body     string
@@ -50,6 +66,15 @@ type parsedCommand struct {
 	isAdmin  bool
 	message  *discordgo.Message
 	prefix   string
+=======
+	command   string
+	args      []string
+	body      string
+	chatType  int
+	permLevel BotPermissionLevel
+	message   *discordgo.Message
+	prefix    string
+>>>>>>> Stashed changes:bot/command.go
 }
 
 // Parses a string (message content)
@@ -70,9 +95,9 @@ func parseCommand(session *discordgo.Session, msg *discordgo.Message) (*parsedCo
 	}
 
 	if msg.GuildID == "" {
-		cmd.chatType = chatTypeDm
+		cmd.chatType = ChatTypeDm
 	} else {
-		cmd.chatType = chatTypeServer
+		cmd.chatType = ChatTypeServer
 	}
 
 	lines := strings.SplitN(msg.Content, "\n", 2)
@@ -142,8 +167,13 @@ func (self *parsedCommand) execute(session *discordgo.Session) error {
 }
 
 func (self *parsedCommand) hasAccess(ec *explicitCommand) bool {
+<<<<<<< Updated upstream:command.go
 	return !((ec.chatType != 0 && ec.chatType != self.chatType) ||
 		(ec.adminOnly && !self.isAdmin))
+=======
+	return (ec.chatType == ChatTypeAny || ec.chatType == self.chatType) &&
+		self.permLevel >= ec.permLevel
+>>>>>>> Stashed changes:bot/command.go
 }
 
 type implicitCommand struct {

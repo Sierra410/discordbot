@@ -1,7 +1,8 @@
 package main
 
-import "github.com/bwmarrin/discordgo"
+// import "github.com/bwmarrin/discordgo"
 
+<<<<<<< Updated upstream
 func init() {
 	mustAddExplicitCommand(&explicitCommand{
 		adminOnly:   true,
@@ -11,15 +12,26 @@ func init() {
 		function:    commandConfig,
 	})
 }
+=======
+// func init() {
+// 	mustAddExplicitCommand(&explicitCommand{
+// 		permLevel:   botPermBotAdmin,
+// 		chatType:    chatTypeAny,
+// 		command:     "config",
+// 		helpMessage: "Usage: config reload",
+// 		function:    commandConfig,
+// 	})
+// }
+>>>>>>> Stashed changes
 
-func commandConfig(self *explicitCommand, session *discordgo.Session, cmd *parsedCommand) (string, error) {
-	switch {
-	case cmd.hasArg("reload"):
-		logInfo.Println("Reloading config")
-		cfg.Load()
+// func commandConfig(self *explicitCommand, session *discordgo.Session, cmd *parsedCommand) (string, error) {
+// 	switch {
+// 	case cmd.hasArg("reload"):
+// 		logInfo.Println("Reloading config")
+// 		cfg.Load()
 
-		return "Reloading config", nil
-	}
+// 		return "Reloading config", nil
+// 	}
 
-	return self.helpMessage, nil
-}
+// 	return self.helpMessage, nil
+// }
