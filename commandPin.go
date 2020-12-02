@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -15,22 +14,6 @@ func init() {
 		helpMessage: "Usage: list to list messages.\nReply to a message with this command to pin/unpin it.",
 		function:    commandPinMessage,
 	})
-}
-
-func getMessageLinkFromRef(mr *discordgo.MessageReference) string {
-	if mr == nil {
-		return ""
-	}
-
-	return getMessageLink(mr.GuildID, mr.ChannelID, mr.MessageID)
-}
-
-func getMessageLink(guildId, channelId, messageId string) string {
-	if guildId == "" || channelId == "" || messageId == "" {
-		return ""
-	}
-
-	return fmt.Sprintf("https://discord.com/channels/%s/%s/%s", guildId, channelId, messageId)
 }
 
 func commandPinMessage(self *explicitCommand, session *discordgo.Session, cmd *parsedCommand) (string, error) {

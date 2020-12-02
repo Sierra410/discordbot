@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -11,9 +12,29 @@ import (
 
 // Discord Stuff
 
-var (
-	logChannelName = "log"
-)
+func getMessageLinkFromMessage(mr *discordgo.Message) string {
+	if mr == nil {
+		return ""
+	}
+
+	return getMessageLink(mr.GuildID, mr.ChannelID, mr.ID)
+}
+
+func getMessageLinkFromRef(mr *discordgo.MessageReference) string {
+	if mr == nil {
+		return ""
+	}
+
+	return getMessageLink(mr.GuildID, mr.ChannelID, mr.MessageID)
+}
+
+func getMessageLink(guildId, channelId, messageId string) string {
+	if guildId == "" || channelId == "" || messageId == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("https://discord.com/channels/%s/%s/%s", guildId, channelId, messageId)
+}
 
 type channelSearchFunc func(*discordgo.Channel) bool
 
