@@ -52,6 +52,23 @@ type explicitCommand struct {
 	function func(*explicitCommand, *discordgo.Session, *parsedCommand) (string, error)
 }
 
+type implicitCommand struct {
+	permLevel botPermissionLevel
+	function  func(*discordgo.Session, *discordgo.Message) string
+}
+
+func (self *implicitCommand) execute(session *discordgo.Session, message *discordgo.Message) {
+	permLevel := cfg.GetPermissionLevel(session, message.GuildID, message.Author.ID)
+
+	if permLevel < self.permLevel {
+		return
+	}
+
+	if s := self.function(session, message); s != "" {
+		sendMultiMessage(session, message.ChannelID, s)
+	}
+}
+
 type parsedCommand struct {
 	command   string
 	args      []string
@@ -155,11 +172,6 @@ func (self *parsedCommand) execute(session *discordgo.Session) error {
 func (self *parsedCommand) hasAccess(ec *explicitCommand) bool {
 	return (ec.chatType == chatTypeAny || ec.chatType == self.chatType) &&
 		self.permLevel >= ec.permLevel
-}
-
-type implicitCommand struct {
-	adminOnly bool
-	function  func(*discordgo.Session, *discordgo.Message)
 }
 
 func addReadyCallback(f func(*discordgo.Session, *discordgo.Ready)) {

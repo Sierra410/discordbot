@@ -18,13 +18,8 @@ func messageCreate(session *discordgo.Session, data *discordgo.MessageCreate) {
 	case errArgsParseFailed:
 		sendMultiMessage(session, msg.ChannelID, err.Error())
 	case errNotCommand:
-		isa := cfg.IsAdmin(session, msg.GuildID, msg.Author.ID)
 		for _, ic := range implicitCommands {
-			if ic.adminOnly && !isa {
-				continue
-			}
-
-			ic.function(session, msg)
+			ic.execute(session, msg)
 		}
 	default:
 		// Unknown error
